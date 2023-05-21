@@ -6,11 +6,11 @@ Using an ATtiny84 and NRF24l01 module.
 - [Schematic](#Schematic)
 
 ## Pcb
-<br>
+&nbsp;
 ![img](https://github.com/Peppson/Vattna_Bara/blob/main/Pcb.png)
 
 
 ## Schematic
-<br>
+&nbsp;
 ![img](https://github.com/Peppson/Vattna_Bara/blob/main/Schematic.png)
 
