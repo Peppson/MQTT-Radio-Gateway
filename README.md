@@ -1,6 +1,6 @@
-# Vattna_Bara?
+# Vattna_Bara? 🤔
 
-Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
+Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant. 
 
 - [Pcb](#Pcb)
 - [Schematic](#Schematic)
