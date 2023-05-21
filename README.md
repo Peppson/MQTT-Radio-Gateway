@@ -1,3 +1,3 @@
 # Vattna_Bara
 
-![test](https://github.com/Peppson/Arduino-solder-station/blob/main/Schematics.PNG)
+![test](https://github.com/Peppson/Vattna_Bara/blob/main/Pcb.png)
