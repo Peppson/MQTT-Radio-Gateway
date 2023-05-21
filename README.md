@@ -5,7 +5,6 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 - [Pcb](#Pcb)
 - [Schematic](#Schematic)
 
-&nbsp;
 ## Pcb
 &nbsp;
 ![img](https://github.com/Peppson/Vattna_Bara/blob/main/Pcb.png)
