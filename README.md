@@ -17,6 +17,7 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 &nbsp;
 
 ## Parts
+&nbsp;
 - Generic Solar Panel 5-6V, 200mA
 - Generic Lipo Battery 3500mAh
 - Generic On/Off Switch
@@ -33,3 +34,4 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 - ATtiny84 [Link](https://www.electrokit.com/produkt/attiny84a-pu-dip-14-8-bit-mcu-flash-8k/)
 - Dil Socket 14 [Link](https://www.electrokit.com/produkt/dil-hallare-14-pin/)
 - NRF24L01 [Link](https://www.amazon.se/-/en/AZDelivery-Compatible-NRF24L01-Wireless-Raspberry/dp/B075DBDS3J/ref=sr_1_5?keywords=nrf24l01&qid=1684668788&sprefix=nrf24%2Caps%2C91&sr=8-5&th=1)
+&nbsp;
