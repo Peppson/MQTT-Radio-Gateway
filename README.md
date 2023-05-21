@@ -17,7 +17,6 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 &nbsp;
 
 ## Parts
-&nbsp;
 - Generic Solar Panel 5-6V, 200mA
 - Generic Lipo Battery 3500mAh
 - Generic On/Off Switch
