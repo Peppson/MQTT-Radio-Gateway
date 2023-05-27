@@ -8,12 +8,12 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 &nbsp;
 ## Pcb
 &nbsp;
-![img](https://github.com/Peppson/Vattna_Bara/blob/main/Pcb.png)
+![img](https://github.com/Peppson/Vattna_Bara/blob/main/Images/Pcb.png)
 
 &nbsp;
 ## Schematic
 &nbsp;
-![img](https://github.com/Peppson/Vattna_Bara/blob/main/Schematic.png)
+![img](https://github.com/Peppson/Vattna_Bara/blob/main/Images/Schematic.png)
 &nbsp;
 
 ## Parts
