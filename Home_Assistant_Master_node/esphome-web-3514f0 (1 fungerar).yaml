@@ -44,9 +44,12 @@ custom_component:
   components:
   - id: my_custom_id
 
+# Grab current time from HA
+time:
+  - platform: homeassistant
+    id: esptime
+    update_interval: 24h
 
-
-    
  
-    
-        
+
+
