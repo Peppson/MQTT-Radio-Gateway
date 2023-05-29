@@ -1,36 +1,32 @@
 
 /*
 ######################### NRF 0 Master #########################
-
-# EspHome custom C++ bridge for Home Assistant                                                                 
-# Library, TMRh20/RF24: https://github.com/tmrh20/RF24/             
-# Class config: https://nrf24.github.io/RF24/classRF24.html         
-# https://github.com/Peppson/?
-
-# Install ESPHome on device, via browser ezpz
-# update new code over OTA
-
-
-C:\Users\Jw\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.9\libraries\SPI\src\SPI.h
-
-
+#                                                              #
+# - EspHome, NRF24L01 bridge to Home Assistant                 #                                          
+# - Library, TMRh20/RF24: https://github.com/tmrh20/RF24/      #     
+# - Class config: https://nrf24.github.io/RF24/classRF24.html  #     
+# - NRF24L01 Address "0"                                       #
+#                                                              #
+################################################################
 */
+
 
 // Set to 1 when compiling for ESP_HOME
 #define ESP_HOME 1
 
-
-
 #include <nRF24L01.h>  
 #include <RF24.h>
-
 #define CE_PIN 6
 #define CSN_PIN 5
 
-// Specifics for EspHome 
+// Address array for "This_dev_address". Must be declared before "class nrfmaster"?????
+const uint8_t
+address[][6] = 
+{ "1Node", "2Node", "3Node", "4Node", "5Node" };     
+
+// Specifics for ESPHome 
 #if ESP_HOME
     #include "esphome.h"
-    //#include <real_time_clock.h>
     #define print(x) ESP_LOGD("custom_component", x);
     class nrfmaster : public Component, public CustomAPIDevice {
     public:
@@ -38,20 +34,14 @@ C:\Users\Jw\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.9\librarie
     #define print(x) Serial.println(x);
 #endif
 
-//RF24 radio(CE_PIN, CSN_PIN);  // Init radio object
 
 
 // Variables
-uint8_t  
-Node_start,                                         // Pump cant start again within 10s (0)                                      
-Pump_time = 2,                                      // How long should the pump run? in seconds
-NTP_time,
-Sender_address;                                     // Init
-                   
-const uint8_t                                           
-This_dev_address = 0;                               // Which pipe + device address            User Controlled
-//const address[][6] =  
-//{ "1Node", "2Node", "3Node", "4Node", "5Node" };    // Address array for "This_dev_address"      
+uint8_t                                    
+Pump_time = 2,                                      // Node 1 variable
+NTP_time,                                           
+Sender_address,                                     // Init
+This_dev_address = 0;                               // Device address 0 = master              User Controlled
 
 unsigned long
 Prev_millis,                                        // Init
@@ -60,23 +50,50 @@ Current_millis;                                     // Init
 const unsigned long
 ADC_interval = 1000UL*60*60*2;                      // How often send ADC data?               User Controlled
 
-
-
-
-
-
-
-
-
-
-
+/*
 struct Rx_package {
     String info;                                // what kind of message 
-    const uint8_t from;      // Who is this message from               
+    const uint8_t from;                         // Who is this message from               
     float bat_charge;                           // Battery charge left as %
   };
+*/
 
 
+// Setup
+//RF24 radio(CE_PIN, CSN_PIN);  // Init radio object
+
+#if ESP_HOME
+void setup() override {
+    register_service(&nrfmaster::NRF_node_1, "version_2", {"Pump_time"});           // Create Bridge to HA 
+    //register_service(&nrfmaster::NRF_node_2, "NRF_node_2", {"","",""...});        // From HA to dev 
+    //call_homeassistant_service("service_name", {{"what field", "text input"}});   // From dev to HA
+#else
+    void setup() {
+    Serial.begin(9600);
+#endif
+
+// void setup() {
+
+    // Grab current time
+    //Prev_millis = millis();
+       
+    /*
+    // Radio init
+    radio.begin();
+    delay(150);
+    radio.setPALevel(RF24_PA_MIN);                                          // Transmitter strength   
+    radio.setChannel(124);                                                  // Above Wifi 
+    radio.setDataRate(RF24_1MBPS);                                          // RF24_2MBPS, RF24_1MBPS, RF24_250KBPS                                      
+    
+    
+    radio.openReadingPipe(This_dev_address, address[This_dev_address]);     // What pipe to listen on ALL
+    radio.startListening();
+    
+    // Set the addresses for all pipes to TX nodes
+    for (uint8_t i = 0; i < 5; ++i)
+      radio.openReadingPipe(i, address[i]);
+    */
+}
 
 
 // Send message 
@@ -96,22 +113,22 @@ bool Send_message(uint8_t To_which_node = 0, bool On_off = false) {
             Tx_data.from = This_dev_address;         
             Tx_data.Pump_T = Pump_time;              
             Tx_data.NTP_T = NTP_time;                
-            Tx_data.Pump_On = On_off;                
+            Tx_data.Pump_On = On_off;             
             break;
-
+        
+        // To NRF node 2 
         case 2:
-            //node 2
-            break;
+            break;  
 
         default:
+            return false;
             break;       
     }
     // Send message
+    //radio.openWritingPipe(address[To_which_node]);
     //return radio.write( &Tx_data, sizeof(Tx_package) );
-    return true;      
+    return true;    
 }
-
-
 
 
 // Try to send message 3 times
@@ -120,89 +137,37 @@ bool Try_send_message(uint8_t To_which_node = 0, bool On_off = false){
       if (Send_message(To_which_node, On_off)) {
         return true;
       } 
-      delay(150);
+      delay(75); // Eventually falls inside a nodes "listening window"
   }
   return false;
 }
 
 
+// NRF_node_1 start, call from Home Assistant
+void NRF_node_1(int Pump_time) {
 
-
-
-
-
-
-
-// Setup
-#if ESP_HOME
-void setup() override {
-    // Wait for ESPHome to fully initalize 
-    //Prev_millis = millis();
-    //while (millis() > (Prev_millis + 1000*5)) {}
-    register_service(&nrfmaster::NRF_node_1, "hello_world", {"Pump_time"});
-    //register_service(&nrfmaster::NRF_node_2, "NRF_node_2", {"","",""...});
-    //call_homeassistant_service("service_name", {{"what field", "text input"}});
-
-    //RealTimeClock.set_timezone(UTC+10:00); 
-    //RealTimeClock.get_timezone();
-    //RealTimeClock.timestamp_now(); 
-#else
-    void setup() {
-    Serial.begin(9600);
-#endif
-
-// void setup() {
-
-    
-
-
-    // Grab current time   
-
-
-
-    /* 
-    // Radio init
-    radio.begin();
-    delay(150);
-    radio.setPALevel(RF24_PA_MIN);                                          // Transmitter strength   
-    radio.setChannel(124);                                                  // Above Wifi 
-    radio.setDataRate(RF24_1MBPS);                                          // RF24_2MBPS, RF24_1MBPS, RF24_250KBPS
-    radio.openWritingPipe(address[1]);                                      // Only change for master
-    radio.openReadingPipe(This_dev_address, address[This_dev_address]);     // What pipe to listen on ALL
-    radio.startListening();
-    */
-
-}
-
-
-
-// NRF_node_1 start call from Home Assistant
-void NRF_node_1(int Pump_Time) {
-    //Pump_time = Pump_Time;
     //radio.stoptListening();
     //if (Try_send_message(1, true)) {
-       //radio.startListening(); 
+        //print("Message successful");
     //}
+    //radio.startListening();
 
-
-    if (Pump_Time == 1){
-        print("1");
-    } else if (Pump_Time == 2) {
-        print("2");
+    
+    if (Pump_time == 1) {
+        print("Number is 1");
+    } else if (Pump_time == 2) {
+        print("Number is 2");
     } else {
-        print("Call service");
-
-
-
-
-
-
+        // call_homeassistant_service("notify.mobile_app_iphone_jarka", {{"message", "yep!"}});   // test    
     }
-
 }
 
 
-
+/*
+// NRF_node_2 start, call from Home Assistant
+void NRF_node_2(<variable>) {
+}
+*/
 
 
 // Main loop
@@ -213,18 +178,9 @@ void NRF_node_1(int Pump_Time) {
 #endif
 
 // void loop()
-    // Nada
-    
-    //if (millis() > (Prev_millis + 1000*2)){
-    //    Prev_millis = millis();
-    //    print("loop");
-    //}
-    ESP_LOGD("custom_component", "test");
+    print(".");
     delay(2000);
 }
-
-
-
 
 
 // For EspHome Class
@@ -232,3 +188,4 @@ void NRF_node_1(int Pump_Time) {
     };
 #endif
 
+// call_homeassistant_service("notify.mobile_app_iphone_jarka", {{"message", "yep!"}});   // test
