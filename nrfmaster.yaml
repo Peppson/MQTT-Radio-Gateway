@@ -1,4 +1,5 @@
-### Config for ESPHome NRF_Master ###
+
+### Config for ESPHome NRF24L01 Master Node ###
 
 
 # Setup
@@ -7,10 +8,10 @@ esphome:
   friendly_name: ESPHome Web 3515f0
   includes:
     - testone.h
-  #libraries:
-  #  - SPI
-  #  - RF24
-  #  - nRF24L01
+  libraries:
+    - SPI
+    - RF24
+    - nRF24L01
 
 # Board
 esp32:
@@ -24,11 +25,10 @@ logger:
 
 # Enable Home Assistant API
 api:
-    #host: 192.168.1.51
   encryption:
-    key: "mRzZ3BMML0YQ0GusREoGnq/c4GS2YCXvoh6sETzFVbI="
+    key: !secret api_key
 ota:
-  password: "9e2026895a1132879bb94ec5c6c423b0"
+  password: !secret ota_password 
 
 # Wifi
 wifi:
