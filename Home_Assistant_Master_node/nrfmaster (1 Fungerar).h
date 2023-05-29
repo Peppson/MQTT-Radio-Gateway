@@ -59,12 +59,13 @@ struct Rx_package {
 */
 
 
+
 // Setup
 //RF24 radio(CE_PIN, CSN_PIN);  // Init radio object
 
 #if ESP_HOME
 void setup() override {
-    register_service(&nrfmaster::NRF_node_1, "version_2", {"Pump_time"});           // Create Bridge to HA 
+    register_service(&nrfmaster::NRF_node_1, "version_3", {"Pump_time"});           // Create Bridge to HA 
     //register_service(&nrfmaster::NRF_node_2, "NRF_node_2", {"","",""...});        // From HA to dev 
     //call_homeassistant_service("service_name", {{"what field", "text input"}});   // From dev to HA
 #else
@@ -73,6 +74,8 @@ void setup() override {
 #endif
 
 // void setup() {
+
+
 
     // Grab current time
     //Prev_millis = millis();
@@ -158,6 +161,7 @@ void NRF_node_1(int Pump_time) {
     } else if (Pump_time == 2) {
         print("Number is 2");
     } else {
+        print("annars");
         // call_homeassistant_service("notify.mobile_app_iphone_jarka", {{"message", "yep!"}});   // test    
     }
 }
@@ -178,8 +182,25 @@ void NRF_node_2(<variable>) {
 #endif
 
 // void loop()
-    print(".");
-    delay(2000);
+
+
+
+    
+
+
+
+    //print(".");
+    //delay(2000);
+
+
+    
+    //auto time_yep = id(esptime).now();
+    //int hour = time_yep.hour();
+    auto test = id(esptime).utcnow();
+
+    ESP_LOGD("custom_component", "My: %lld", test);
+    delay(1000); 
+
 }
 
 
