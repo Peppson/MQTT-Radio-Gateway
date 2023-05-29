@@ -8,6 +8,7 @@ esphome:
   friendly_name: ESPHome NRF Master         #ESPHome Web 3515f0
   includes:
     - nrfmaster.h
+    #- basic.h
   libraries:
     - SPI
     - RF24
