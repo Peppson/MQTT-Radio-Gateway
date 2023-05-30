@@ -5,7 +5,7 @@
 # Setup
 esphome:
   name: esphome-web-3514f0
-  friendly_name: ESPHome NRF Master         #ESPHome Web 3515f0
+  friendly_name: ESPHome NRF Master
   includes:
     - nrfmaster.h
     #- basic.h
@@ -50,6 +50,5 @@ time:
     id: esptime
     update_interval: 24h
 
- 
 
 
