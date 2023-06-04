@@ -10,19 +10,22 @@
 #####################################################################
 */
 
+
 // Main
 #include "Setup_Node_1.h"
 #include "Functions_Node_1.h"
 using namespace Functions;
+
 
 // Setup
 void setup() {
     Functions::Setup_everything();
     Current_millis = millis();
     Prev_millis = Current_millis;
-    Functions::Send_ADC_get_NTP();
-}
+    //Functions::Send_ADC_get_NTP();
 
+    delay(5000);
+}
 
 // Main loop
 void loop() {
@@ -42,7 +45,7 @@ void loop() {
 
         // Listening for message
         if (Wait_for_message(200)) {
-            print("Message recieved!");
+            println("Message recieved!");
             radio.read(&Package, sizeof(Package));
 
             // Expected package size?
@@ -50,16 +53,19 @@ void loop() {
                 radio.flush_rx();
                 }
             // Message to variables
-            else if (Package.Msg_to_who == This_dev_address && Package.Msg_state) {
+            else if ((Package.Msg_to_who == This_dev_address) && (Package.Msg_state) && (Package.Msg_from_who == Master_node_address)) {
                 setTime(Package.Msg_time);
-                Start_water_pump(Package.Msg_int);   
-            } 
+                Start_water_pump(Package.Msg_int);
+                Package = {};
+                radio.flush_rx(); // Necessary?
+                radio.flush_tx();   
+            }
         }
         // Powerdown radio
         radio.stopListening();
         if (i < Main_loop_iterations) { 
             radio.powerDown();
-            delay(395);
+            delay(Sleep_radio_for_ms);
         }
     }
     // Send battery status every Time_interval
