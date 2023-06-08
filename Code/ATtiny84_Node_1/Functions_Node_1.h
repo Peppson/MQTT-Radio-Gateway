@@ -7,13 +7,20 @@
 #pragma once
 namespace Functions {
 
+
 // Setup 
 void Setup_everything() {
 
+    // Reset Watchdog on wakeup
+    #if ATtiny84_ON
+        MCUSR &= ~(1<<WDRF);
+        wdt_disable();
+    #endif
+
     // Serial init
     #if SERIAL_ON
-        Serial.begin(9600);
-        while (!Serial) {}
+        SERIAL_BEGIN(9600);
+        while (!Serial) {} 
 
         // Fill console field with /n
         for(uint8_t i=0; i<25; i++) {
@@ -30,7 +37,6 @@ void Setup_everything() {
             while (true) {}  
         }  
     #endif
-
     radio.setPALevel(Radio_output);                                         // Transmitter strength   
     radio.setChannel(Radio_channel);                                        // Radio channel (above wifi) 
     radio.setDataRate(RF24_2MBPS);                                          // Datarate: RF24_2MBPS, RF24_1MBPS, RF24_250KBPS
@@ -39,48 +45,23 @@ void Setup_everything() {
     
     // Pins 
     pinMode(PUMP_PIN, OUTPUT);
-    digitalWrite(PUMP_PIN, LOW);
     pinMode(ADC_PIN, INPUT);
-    delay(7000);
-
+    digitalWrite(PUMP_PIN, LOW);
+    delay(1000);
+    
     // Watchdog init
     #if ATtiny84_ON
-        wdt_enable(WDTO_8S); 
-    #endif 
+        //wdt_enable(WDTO_8S); 
+    #endif  
 }
-
-
-// Package debug
-#if !ATtiny84_ON
-#if SERIAL_ON
-void Print_package() {
-    println();
-    println("#########  Package  #########");
-    print("To who:      ");
-    println(Package.Msg_to_who);
-    print("From who:    ");
-    println(Package.Msg_from_who);
-    print("Time:        ");                   
-    println(Package.Msg_time);
-    print("Int:         ");                      
-    println(Package.Msg_int);
-    print("Float:       ");                        
-    println(Package.Msg_float);
-    print("Bool:        ");                                                                                   
-    println(Package.Msg_state);
-    println();
-}
-#endif
-#endif
 
 
 // Message received, start waterpump for x seconds
 void Start_water_pump(uint8_t How_long = 2){
     println(__func__);
-    #if ATtiny84_ON
-        wdt_reset();
-    #endif
-    if (How_long > 8) {
+    WDT_RESET();
+
+    if (How_long >= 8) {
         How_long = 1;
     }
     digitalWrite(PUMP_PIN, HIGH);
@@ -90,7 +71,87 @@ void Start_water_pump(uint8_t How_long = 2){
 }
 
 
-// Watchdog ISR TODO
+// Get ADC reading from battery, calc average, convert to % (0-100%)
+uint16_t Battery_charge_remaining() {
+    println(__func__);
+    WDT_RESET();
+    radio.stopListening();
+    radio.powerDown();
+    delay(10);
+
+    // Grab battery reading while radio is powered off
+    float Sum = 0;
+    for (uint8_t i = 0; i < 100; i++) {
+        int Value = analogRead(ADC_PIN); 
+        Sum += Value;
+        delay(10);
+    }
+    float Average = Sum / 100; 
+    float Percentage = (Average - Min_ADC_reading) / (Max_ADC_reading - Min_ADC_reading);  // (x - min) / (max - min) = %
+    uint16_t Charge_remaining = Percentage * 100;
+
+    radio.powerUp();
+    delay(10);
+    return Charge_remaining;
+}
+  
+
+// Send message 
+bool Send_message(uint16_t Arg_float) {
+    println(__func__);
+
+    // Insert variables and NODE ID in the upper most 4 bytes
+    Message_package[0] = (This_dev_address << 12) | Master_node_address;    // Who is this message for?
+    Message_package[1] = (This_dev_address << 12) | This_dev_address;       // Who is this message from?
+    Message_package[2] = (This_dev_address << 12) | 0;                      // Node_1 how long the pump should run for
+    Message_package[3] = (This_dev_address << 12) | Arg_float;              // Battery charge remaining (float[0.00 - 1.00] x 100)
+    Message_package[4] = (This_dev_address << 12) | 0;                      // State
+    Message_package[5] = (This_dev_address << 12) | 0;                      // Time
+
+    // Send message 
+    for (uint8_t i=0; i < 6; i++) {
+        if (!radio.write(&Message_package[i], sizeof(Message_package[i]))) {
+            // Retry loop foreach [i]
+            for (uint8_t j=0; j < 3; j++) { 
+                delay(25);
+                if(radio.write(&Message_package[i], sizeof(Message_package[i]))) {
+                    break; // Exit retry loop if successful
+                }
+                else if (j == 2) {
+                    return false;
+                }  
+            }
+        }
+        delay(1);      
+    }
+    return true;    
+} 
+
+
+// Try to send message n times
+bool Try_send_message() {
+    uint16_t Charge_remaining = Battery_charge_remaining();
+    for (uint8_t i = 0; i < 4; i++) {
+        if (Send_message(Charge_remaining)) {
+            println("Message successful!!");
+            return true;
+        }
+        delay(200);
+    }
+    println("Message failed!!");
+    return false;
+}
+
+
+// Debug rm
+void Send_debug() {
+    radio.stopListening();
+    Try_send_message();
+    radio.startListening();
+}
+
+
+// Watchdog ISR 
 #if ATtiny84_ON
 ISR (WDT_vect) {
     wdt_disable();
@@ -98,10 +159,12 @@ ISR (WDT_vect) {
 }
 
 
-// ATtiny84 + NRF24 deepsleep TODO
+// ATtiny84 + NRF24 deepsleep (about 5 µA)
 void Deepsleep() {
+    println(__func__);
 
-    // Turn off everything 
+    // Turn off everything
+    WDT_RESET(); 
     radio.stopListening();
     radio.powerDown();
     delay(10);
@@ -110,8 +173,8 @@ void Deepsleep() {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sleep_enable();
 
-    // Wake by watchdog every 8s, go back to sleep if Deepsleep_count < 5400. About 12h
-    while (Deepsleep_count < 5400) {
+    // Wake by watchdog every 8s, go back to sleep if Deepsleep_count < 4400. About 12h. Each cycle = 9.8s
+    while (Deepsleep_count < 1) {
         noInterrupts();
 		sleep_bod_disable();
 
@@ -119,7 +182,7 @@ void Deepsleep() {
 		MCUSR = 0; 	
 		WDTCSR = bit (WDCE) | bit(WDE);                 // WDT mode "interrupt" instead of "reset" 
 		WDTCSR = bit (WDIE) | bit(WDP3) | bit(WDP0);    // WDT time interval (max 8s)
-        wdt_reset(); 
+        WDT_RESET(); 
 		interrupts();
 		sleep_cpu(); // ZZZZZzzzzzzZZZZzzzzzZZZZZ 
 	}
@@ -127,18 +190,10 @@ void Deepsleep() {
 	sleep_disable();        // Sleep disable
 	Deepsleep_count = 0;    // Reset deepsleep counter
 	ADCSRA = prevADCSRA;    // Re-enable ADC
-    delay(25);
-} 
-#else
-
-
-// Pico Fake_deepsleep for testing 
-void Fake_deepsleep(){
-    println(__func__);
-    radio.stopListening();
-    radio.powerDown();
-    delay(5000);
-    println("Aight, back!");
+    delay(500);
+    println("Wakeup");
+    delay(2000);
+    setup();                // Upon wakeup
 }
 #endif
 
@@ -156,70 +211,47 @@ void Reset_board_after_15min() {
 }
 
 
-// Get ADC reading from battery, calc average, convert to %
-float Calc_battery_charge() {
-    println(__func__);
-    radio.stopListening();
-    radio.powerDown();
-    delay(10);
-
-    // Grab battery reading while radio is powered off
-    float ADC_sum = 0;
-    for (uint8_t i = 0; i < 100; i++){
-        int Value = analogRead(ADC_PIN); 
-        ADC_sum += Value;
-        delay(5);
-    }
-    float ADC_average = ADC_sum / 100; // Get average
-    float Charge_remaining = (ADC_average - Min_ADC_reading) / (Max_ADC_reading - Min_ADC_reading);  // (x - min) / (max - min) = % 
-    radio.powerUp();
-    delay(10);
-    return Charge_remaining;
-}
-
-
-// Send message 
-bool Send_message(uint8_t address, float Charge_remaining = 0) {
-    println(__func__);
-
-    // Insert variables
-    Package.Msg_to_who = address;                       // Who is this message for?
-    Package.Msg_from_who = This_dev_address;            // Who is this message from?
-    Package.Msg_time = 0;                               // 
-    Package.Msg_int = 0;                                // 
-    Package.Msg_float = Charge_remaining;               // Battery charge remaining
-    Package.Msg_state = false;                          // 
+// Grab available message, No ID checking needed
+bool Get_available_message() {
+    unsigned long Msg_timer = millis() + 1000 * 5;
+    uint16_t Message;
+    uint16_t CRC_check;
+    uint16_t CRC_sum = 0;
     
-    // Send message
-    return radio.write( &Package, sizeof(Package) );     
-} 
-
-
-// Try to send message 4 times
-bool Try_send_message(uint8_t address = Master_node_address) {
-    println(__func__);
-    float Charge_remaining = Calc_battery_charge();
-    for (uint8_t i = 0; i < 4; i++) {
-        if (Send_message(address, Charge_remaining)) {
-            println("Message successful!!");
-            return true;
+    // Grab 6 packages in rapid succession
+    for (uint8_t i=0; i<6; i++) {
+        if (radio.available()) {     
+            radio.read(&Message, sizeof(Message));
+            Message_package[i] = Message;
+            CRC_check = (Message >> 12) & 0x0F;
+            CRC_sum += CRC_check;              
         }
-        delay(1000);
+        // Wait for next Msg. Break if time is up
+        if (i < 5) {                                        
+            while (!radio.available()) {
+                if (millis() > Msg_timer) {
+                    return false;
+                }
+            }  
+        }
+        // "Checksum" check  
+        else if (CRC_sum != 15) {
+            return false;
+        }
     }
-    println("Message failed!!");
-    return false;
+    return true;
 }
 
 
 // Wait for message 
 bool Wait_for_message(uint16_t Offset) {
-    unsigned long Msg_wait_timer = (Current_millis + Offset);
+    unsigned long Msg_wait_timer = (millis() + Offset);
     uint8_t Pipe;
 
     // Start listening
     while (true) {
         if (radio.available(&Pipe) && Pipe == This_dev_address) {
-            return true;
+            return Get_available_message();
         }
         // Break after millis ms
         if (millis() > Msg_wait_timer) {
@@ -229,9 +261,10 @@ bool Wait_for_message(uint16_t Offset) {
 }
 
 
-// Catchy
+// Send Bat status get currect time
 void Send_ADC_get_NTP() {
     println(__func__);
+    WDT_RESET();
 
     // Get NTP time from master or hard reset after 15min
     if (!Try_send_message()) {
@@ -242,32 +275,41 @@ void Send_ADC_get_NTP() {
     radio.flush_tx();
     radio.startListening();
     delay(5);
-    #if ATtiny84_ON
-        wdt_reset();
-    #endif 
-    
+  
     // Wait for return message
-    Current_millis = millis();
     if (Wait_for_message(2000)) {
         println("Return message successful!!");
-        radio.read(&Package, sizeof(Package));
-   
-        // Expected package size?
-        if (sizeof(Package) > 20) {
-                radio.flush_rx();
-        }
+
         // Message to variables
-        else if ((Package.Msg_to_who == This_dev_address) && (Package.Msg_from_who == Master_node_address)) {
-            setTime(Package.Msg_time);
-            delay(2);
-            Package = {};       // Reset package content to 0
-            radio.flush_rx();   // Necessary?
+        if ((Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address)) {
+            //setTime(Message_package[5]); //TODO
+            println("Current time acquired!");
+            print("Time:    "); println(Message_package[5]);
+            radio.flush_rx();
             radio.flush_tx();
+            delay(5); 
         } 
     } 
     else {
-        Reset_board_after_15min();
+        Reset_board_after_15min(); 
     }
 }
-}
 
+
+// ADC CAL
+#if ADC_CAL_ON
+    void ADC_CAL_FUNC() {
+            float Sum = 0;
+            for (uint8_t i = 0; i < 100; i++) {
+                int Value = analogRead(ADC_PIN); 
+                Sum += Value;
+                delay(10);
+            }
+            float Average = Sum / 100; 
+            print("ADC: ");println(Average);
+            Average = 0;
+        }
+#endif
+
+
+}
