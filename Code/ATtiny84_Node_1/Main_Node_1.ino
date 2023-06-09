@@ -1,8 +1,8 @@
 
 /*
-#########################  NRF Node 1 Main  #########################
+###########################  Node 1 Main  ###########################
 #                                                                   #
-#   - Flower_waterpump, controlled through Home Assistant           #                                          
+#   - Flower_waterpump, controlled via Home Assistant               #                                          
 #   - Library, TMRh20/RF24: https://github.com/tmrh20/RF24/         #     
 #   - Class config: https://nrf24.github.io/RF24/classRF24.html     #     
 #   - NRF24L01 Address "1"                                          #
@@ -19,19 +19,11 @@ using namespace Functions;
 // Setup
 void setup() {
     Setup_everything();
-    //Send_ADC_get_NTP();
-    //Prev_hour = hour();
     #if ADC_CAL_ON
-        while (1) {ADC_CAL_FUNC();}
+        while (1) { ADC_CAL_FUNC(); }
     #endif
-
-    digitalWrite(PUMP_PIN, HIGH);
-    delay(1000);
-    digitalWrite(PUMP_PIN, LOW);
-    Send_ADC_get_NTP();
-    delay(543543534);
-    //Send_debug() 
-    
+    Send_ADC_get_time();
+    Prev_millis = millis() + Update_interval;
 }
 
 
@@ -46,32 +38,32 @@ void loop() {
         delay(2);
         radio.startListening();
 
-        // Listening for message
+        // Listen for incomming messages
         if (Wait_for_message(200)) {
-            println("Message recieved!");
-            // Start Pump command 
-            if ( (Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address) && (Message_package[4] == 1) ) {
+            println("Message received!");
+            // Start waterpump?
+            if ((Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address) && (Message_package[4] == 1)) {
                 Start_water_pump(Message_package[2]);
                 radio.flush_rx(); 
                 radio.flush_tx();   
             }
         }
-        // Powerdown radio
+        // Powerdown radio 
         radio.stopListening();
         if (i < Main_loop_iterations) {
             radio.powerDown();
             delay(Sleep_radio_for_ms);
         }     
-    } /*
-    // Send battery status every Time_interval
-    time_t Current_hour = hour();
-    if (Current_hour >= Prev_hour + Time_interval) {
-        Send_ADC_get_NTP();
-        Prev_hour = hour();
     }
+    // Send battery status every Update_interval //TODO test 
+    Current_millis = millis();   
+    if (Current_millis > Prev_millis) {
+        Send_ADC_get_time();
+        Prev_millis = millis() + Update_interval;
+    } 
     // Time to sleep?
-    if (Current_hour >= Sleep_at_hour) {
+    else if (Current_millis > Sleep_at_this_millis) {
         Deepsleep_device();
-    } */
+    } 
 }
 

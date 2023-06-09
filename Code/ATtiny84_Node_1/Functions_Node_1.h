@@ -1,6 +1,13 @@
 
 /*
-######################  NRF Node 1 Functions  ######################
+########################  Node 1 Functions  #########################
+#                                                                   #
+#   - Flower_waterpump, controlled via Home Assistant               #                                          
+#   - Library, TMRh20/RF24: https://github.com/tmrh20/RF24/         #     
+#   - Class config: https://nrf24.github.io/RF24/classRF24.html     #     
+#   - NRF24L01 Address "1"                                          #
+#                                                                   #
+#####################################################################
 */
 
 // Functions_Node_1
@@ -11,111 +18,121 @@ namespace Functions {
 // Setup 
 void Setup_everything() {
 
-    // Reset Watchdog on wakeup
+    // Reset Watchdog on boot
     #if ATtiny84_ON
         MCUSR &= ~(1<<WDRF);
         wdt_disable();
     #endif
 
-    // Serial init
+    // Serial
     #if SERIAL_ON
         SERIAL_BEGIN(9600);
         while (!Serial) {} 
 
-        // Fill console field with /n
+        // Fill console with /n
         for(uint8_t i=0; i<25; i++) {
             println();
         }
-        // Radio init
+        // Radio
         if (!radio.begin() || !radio.isChipConnected()) {
             println("Radio hardware is not responding!!");
             while (true) {}    
         }
         println("Radio OK!"); 
     #else
+        // With Serial off 
         if (!radio.begin() || !radio.isChipConnected()) {
             while (true) {}  
         }  
     #endif
+
+    // Radio setup
     radio.setPALevel(Radio_output);                                         // Transmitter strength   
     radio.setChannel(Radio_channel);                                        // Radio channel (above wifi) 
     radio.setDataRate(RF24_2MBPS);                                          // Datarate: RF24_2MBPS, RF24_1MBPS, RF24_250KBPS
     radio.openWritingPipe(address[Master_node_address]);                    // Send to master = 0
     radio.openReadingPipe(This_dev_address, address[This_dev_address]);     // What pipe to listen on
     
-    // Pins 
+    // Pin setup
     pinMode(PUMP_PIN, OUTPUT);
     pinMode(ADC_PIN, INPUT);
     digitalWrite(PUMP_PIN, LOW);
     delay(1000);
     
-    // Watchdog init
+    // Watchdog
     #if ATtiny84_ON
-        //wdt_enable(WDTO_8S); 
+        wdt_enable(WDTO_8S); 
     #endif  
 }
 
 
-// Message received, start waterpump for x seconds
+// Message received, start waterpump for n seconds
 void Start_water_pump(uint8_t How_long = 2){
-    println(__func__);
     WDT_RESET();
+    radio.stopListening();
 
-    if (How_long >= 8) {
-        How_long = 1;
+    // To keep the pump from flooding my apartment...
+    if (How_long >= Pump_runtime_max) {
+        How_long = 2;
     }
+    print("Pump: "); print(How_long); println("s");
+
+    // Toggle transistor on PUMP_PIN
+    wdt_disable(); 
     digitalWrite(PUMP_PIN, HIGH);
     delay(How_long * 1000);
     digitalWrite(PUMP_PIN, LOW);
-    delay(2);  
+    wdt_enable(WDTO_8S); 
+    delay(5);  
 }
 
 
-// Get ADC reading from battery, calc average, convert to % (0-100%)
+// Get ADC reading from battery
 uint16_t Battery_charge_remaining() {
-    println(__func__);
+    println("Bat");
     WDT_RESET();
     radio.stopListening();
     radio.powerDown();
     delay(10);
 
     // Grab battery reading while radio is powered off
-    float Sum = 0;
+    uint32_t Sum = 0;
     for (uint8_t i = 0; i < 100; i++) {
-        int Value = analogRead(ADC_PIN); 
+        uint16_t Value = analogRead(ADC_PIN); 
         Sum += Value;
-        delay(10);
+        delay(10); 
     }
-    float Average = Sum / 100; 
-    float Percentage = (Average - Min_ADC_reading) / (Max_ADC_reading - Min_ADC_reading);  // (x - min) / (max - min) = %
-    uint16_t Charge_remaining = Percentage * 100;
-
+    // Average ADC value (0-1023), all calculations are done on master to save mem
+    uint16_t Charge_remaining = Sum / 100;  
     radio.powerUp();
-    delay(10);
+    delay(10); 
     return Charge_remaining;
 }
   
 
 // Send message 
 bool Send_message(uint16_t Arg_float) {
-    println(__func__);
+    println("Send");
 
-    // Insert variables and NODE ID in the upper most 4 bytes
-    Message_package[0] = (This_dev_address << 12) | Master_node_address;    // Who is this message for?
-    Message_package[1] = (This_dev_address << 12) | This_dev_address;       // Who is this message from?
-    Message_package[2] = (This_dev_address << 12) | 0;                      // Node_1 how long the pump should run for
-    Message_package[3] = (This_dev_address << 12) | Arg_float;              // Battery charge remaining (float[0.00 - 1.00] x 100)
-    Message_package[4] = (This_dev_address << 12) | 0;                      // State
-    Message_package[5] = (This_dev_address << 12) | 0;                      // Time
-
-    // Send message 
+    // Insert variables     
+    Message_package[0] = Master_node_address;       // To who
+    Message_package[1] = This_dev_address;          // From who
+    Message_package[2] = 0;                         // Node_1 how long the pump should run  (Only on RX)
+    Message_package[3] = Arg_float;                 // Battery charge remaining             (ADC reading 0-1023)
+    Message_package[4] = 0;                         // Bool on/off                          (Only on RX)
+    Message_package[5] = 0;                         // Current time                         (Only on RX)
+      
+    // Send message(s)
     for (uint8_t i=0; i < 6; i++) {
-        if (!radio.write(&Message_package[i], sizeof(Message_package[i]))) {
+        // Insert Msg ID in the upper most 4 bytes
+        uint16_t Content = (This_dev_address << 12) | Message_package[i];
+        if (!radio.write(&Content, sizeof(Content))) {
             // Retry loop foreach [i]
-            for (uint8_t j=0; j < 3; j++) { 
+            for (uint8_t j=0; j < 3; j++) {                     
                 delay(25);
-                if(radio.write(&Message_package[i], sizeof(Message_package[i]))) {
-                    break; // Exit retry loop if successful
+                // Exit retry loop if successful
+                if(radio.write(&Content, sizeof(Content))) {
+                    break;                                      
                 }
                 else if (j == 2) {
                     return false;
@@ -124,7 +141,7 @@ bool Send_message(uint16_t Arg_float) {
         }
         delay(1);      
     }
-    return true;    
+    return true;
 } 
 
 
@@ -133,21 +150,26 @@ bool Try_send_message() {
     uint16_t Charge_remaining = Battery_charge_remaining();
     for (uint8_t i = 0; i < 4; i++) {
         if (Send_message(Charge_remaining)) {
-            println("Message successful!!");
+            println("Msg successful!!");
             return true;
         }
         delay(200);
     }
-    println("Message failed!!");
+    println("Msg failed!!");
     return false;
 }
 
 
-// Debug rm
-void Send_debug() {
-    radio.stopListening();
-    Try_send_message();
-    radio.startListening();
+// Hardware reset
+void Hardware_reset_after_15min(uint16_t Seconds = 60 * 15) {
+    println("Hardware reset");
+    #if ATtiny84_ON
+        unsigned long Timeout = 1000UL * Seconds; 
+        wdt_disable();
+        delay(Timeout);
+        wdt_enable(WDTO_15MS);
+        delay(1000); // Wait for watchdog to reset board
+    #endif
 }
 
 
@@ -161,7 +183,7 @@ ISR (WDT_vect) {
 
 // ATtiny84 + NRF24 deepsleep (about 5 µA)
 void Deepsleep() {
-    println(__func__);
+    println("Deepsleep");
 
     // Turn off everything
     WDT_RESET(); 
@@ -184,45 +206,30 @@ void Deepsleep() {
 		WDTCSR = bit (WDIE) | bit(WDP3) | bit(WDP0);    // WDT time interval (max 8s)
         WDT_RESET(); 
 		interrupts();
-		sleep_cpu(); // ZZZZZzzzzzzZZZZzzzzzZZZZZ 
+		sleep_cpu();  
 	}
     // 12 hours passed
 	sleep_disable();        // Sleep disable
 	Deepsleep_count = 0;    // Reset deepsleep counter
 	ADCSRA = prevADCSRA;    // Re-enable ADC
     delay(500);
-    println("Wakeup");
-    delay(2000);
-    setup();                // Upon wakeup
+    Hardware_reset_after_15min(1);
 }
 #endif
 
 
-// Hardware reset TODO
-void Reset_board_after_15min() {
-    println( __func__);
-    #if ATtiny84_ON
-        unsigned long Timeout = 1000UL*60*15;
-        wdt_disable();
-        delay(Timeout);
-        wdt_enable(WDTO_15MS);
-        delay(1000); // Wait for watchdog to reset board
-    #endif
-}
-
-
-// Grab available message, No ID checking needed
+// Get available message
 bool Get_available_message() {
     unsigned long Msg_timer = millis() + 1000 * 5;
-    uint16_t Message;
     uint16_t CRC_check;
     uint16_t CRC_sum = 0;
+    uint16_t Message;
     
     // Grab 6 packages in rapid succession
     for (uint8_t i=0; i<6; i++) {
         if (radio.available()) {     
             radio.read(&Message, sizeof(Message));
-            Message_package[i] = Message;
+            Message_package[i] = Message & 0x0FFF;
             CRC_check = (Message >> 12) & 0x0F;
             CRC_sum += CRC_check;              
         }
@@ -234,8 +241,9 @@ bool Get_available_message() {
                 }
             }  
         }
-        // "Checksum" check  
+        // Expected "Checksum" ?  
         else if (CRC_sum != 15) {
+            print("CRC Error :"); println(CRC_sum);
             return false;
         }
     }
@@ -253,7 +261,7 @@ bool Wait_for_message(uint16_t Offset) {
         if (radio.available(&Pipe) && Pipe == This_dev_address) {
             return Get_available_message();
         }
-        // Break after millis ms
+        // Break after Offset ms
         if (millis() > Msg_wait_timer) {
             return false;
         }
@@ -261,54 +269,80 @@ bool Wait_for_message(uint16_t Offset) {
 }
 
 
-// Send Bat status get currect time
-void Send_ADC_get_NTP() {
-    println(__func__);
+// Used to have <TimeLib.h> for this but ran out of memory :/
+void Calc_time_until_sleep() {
+
+    // Time from master (uint16_t) formated "hhmm"
+    int16_t Current_time = Message_package[5]; 
+
+    // Convert incomming msg to hours and minutes left until Sleep_time
+    int16_t Hour_left = (Sleep_time / 100) - (Current_time / 100);  
+    int16_t Minute_left = (Sleep_time % 100) - (Current_time % 100); 
+
+    if (Minute_left < 0) {      // Negativ minute?
+        Hour_left--;            // Subtract 1 from Hour_left
+        Minute_left += 60;      // Add 60 to Minute_left
+    }
+    if (Hour_left < 0) {        // Negativ hour?
+        Hour_left += 24;        // Add 24
+    }
+    // Sleep at what millis()?
+    unsigned long Millis_left = (Hour_left * 60UL + Minute_left) * 60UL * 1000UL; // Convert to millis
+    Sleep_at_this_millis = Millis_left + millis(); // Add current millis() to get an absolute timestamp
+    println("Time acquired");
+}
+
+
+// Send battery charge remaining, get back current time
+void Send_ADC_get_time() {
+    println("Get time");
     WDT_RESET();
 
-    // Get NTP time from master or hard reset after 15min
-    if (!Try_send_message()) {
-        Reset_board_after_15min();
+    // Get time from master or hard reset
+    for (uint8_t i=0; i<2; i++){ 
+        if (Try_send_message()) {
+            break;
         }
-    // Start listening
+        else if (i == 1){
+            Hardware_reset_after_15min();
+        }
+        delay(6000);
+    }
+    // Message successful! Listening for response
     radio.flush_rx();
     radio.flush_tx();
     radio.startListening();
-    delay(5);
-  
-    // Wait for return message
-    if (Wait_for_message(2000)) {
-        println("Return message successful!!");
+    delay(5); 
 
-        // Message to variables
+    // Wait for return message 
+    if (Wait_for_message(2000)) {
+        println("Re Msg successful!!");
         if ((Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address)) {
-            //setTime(Message_package[5]); //TODO
-            println("Current time acquired!");
-            print("Time:    "); println(Message_package[5]);
+            Calc_time_until_sleep(); // Calculate time until deepsleep, dependent on the current time
             radio.flush_rx();
             radio.flush_tx();
             delay(5); 
         } 
     } 
     else {
-        Reset_board_after_15min(); 
+        Hardware_reset_after_15min(); 
     }
 }
 
 
-// ADC CAL
+// ADC CAL DEBUG FUNC
 #if ADC_CAL_ON
     void ADC_CAL_FUNC() {
-            float Sum = 0;
+        while (true) {
+            uint32_t Sum = 0;
             for (uint8_t i = 0; i < 100; i++) {
-                int Value = analogRead(ADC_PIN); 
+                uint16_t Value = analogRead(ADC_PIN); 
                 Sum += Value;
-                delay(10);
             }
-            float Average = Sum / 100; 
-            print("ADC: ");println(Average);
-            Average = 0;
+            uint16_t Average = Sum / 100;           
+            print("   Int: "); println(Average);
         }
+    }
 #endif
 
 
