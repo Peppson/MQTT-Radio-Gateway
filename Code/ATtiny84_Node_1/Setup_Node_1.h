@@ -37,8 +37,9 @@
 
 #define Pump_runtime_max 10                 // Maximum time pump is allowed to run (s)              
 #define Sleep_time 2100                     // Go to deepsleep at what time? (hhmm)
-#define Update_interval 3*60*60*1000UL      // How often should the node report its battery status? (h)
-#define Main_loop_iterations 10            // How many loop iterations //TODO
+#define Sleep_how_long 12                   // Deepsleep how long in (h)
+#define Update_interval 3*60*60*1000UL      // How often should the node report its battery status? (h*m*s*ms)
+#define Main_loop_iterations 100            // How many loop iterations 
 
 
 // Board Select
@@ -49,14 +50,15 @@
     #define CE_PIN A2         
     #define CSN_PIN A3
     #define PUMP_PIN PB2   
-    #define ADC_PIN A7
+    #define ADC_Measure_PIN A7
+    #define ADC_Enable_Pin A1
     #define Deepsleep_device() Deepsleep();
     #define WDT_RESET() wdt_reset() 
 #else
     #define CE_PIN 0        // Pico 14, arduino 9, pico zero 0
     #define CSN_PIN 1       // Pico 17, arduino 10, pico zero 1
     #define PUMP_PIN 15        
-    #define ADC_PIN 29
+    #define ADC_Measure_PIN 29
     #define Deepsleep_device() Fake_deepsleep();
     #define WDT_RESET()
 #endif

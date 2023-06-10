@@ -1,3 +1,4 @@
+#include "Arduino.h"
 
 /*
 ########################  Node 1 Functions  #########################
@@ -30,12 +31,12 @@ void Setup_everything() {
         while (!Serial) {} 
 
         // Fill console with /n
-        for(uint8_t i=0; i<25; i++) {
+        for(uint8_t i=0; i<20; i++) {
             println();
         }
         // Radio
         if (!radio.begin() || !radio.isChipConnected()) {
-            println("Radio hardware is not responding!!");
+            println("Where radio? :(");
             while (true) {}    
         }
         println("Radio OK!"); 
@@ -55,14 +56,17 @@ void Setup_everything() {
     
     // Pin setup
     pinMode(PUMP_PIN, OUTPUT);
-    pinMode(ADC_PIN, INPUT);
+    pinMode(ADC_Enable_Pin, OUTPUT);
+    pinMode(ADC_Measure_PIN, INPUT);
+    digitalWrite(ADC_Enable_Pin, LOW);
     digitalWrite(PUMP_PIN, LOW);
-    delay(1000);
+    delay(4000);
     
     // Watchdog
     #if ATtiny84_ON
         wdt_enable(WDTO_8S); 
-    #endif  
+    #endif
+    println("Started!");  
 }
 
 
@@ -75,8 +79,6 @@ void Start_water_pump(uint8_t How_long = 2){
     if (How_long >= Pump_runtime_max) {
         How_long = 2;
     }
-    print("Pump: "); print(How_long); println("s");
-
     // Toggle transistor on PUMP_PIN
     wdt_disable(); 
     digitalWrite(PUMP_PIN, HIGH);
@@ -89,23 +91,27 @@ void Start_water_pump(uint8_t How_long = 2){
 
 // Get ADC reading from battery
 uint16_t Battery_charge_remaining() {
-    println("Bat");
+    println("Bat"); 
     WDT_RESET();
     radio.stopListening();
     radio.powerDown();
     delay(10);
+    
+    // Toggle on ADC transistor to let current flow to voltage divider
+    digitalWrite(ADC_Enable_Pin, HIGH);
 
     // Grab battery reading while radio is powered off
     uint32_t Sum = 0;
     for (uint8_t i = 0; i < 100; i++) {
-        uint16_t Value = analogRead(ADC_PIN); 
+        uint16_t Value = analogRead(ADC_Measure_PIN); 
         Sum += Value;
         delay(10); 
     }
     // Average ADC value (0-1023), all calculations are done on master to save mem
+    digitalWrite(ADC_Enable_Pin, LOW);
     uint16_t Charge_remaining = Sum / 100;  
     radio.powerUp();
-    delay(10); 
+    delay(10);
     return Charge_remaining;
 }
   
@@ -117,10 +123,10 @@ bool Send_message(uint16_t Arg_float) {
     // Insert variables     
     Message_package[0] = Master_node_address;       // To who
     Message_package[1] = This_dev_address;          // From who
-    Message_package[2] = 0;                         // Node_1 how long the pump should run  (Only on RX)
-    Message_package[3] = Arg_float;                 // Battery charge remaining             (ADC reading 0-1023)
-    Message_package[4] = 0;                         // Bool on/off                          (Only on RX)
-    Message_package[5] = 0;                         // Current time                         (Only on RX)
+    Message_package[2] = 0;                         // Node_1 run pump for how long     (Only on RX)
+    Message_package[3] = Arg_float;                 // Battery charge remaining         (ADC reading 0-1023)
+    Message_package[4] = 0;                         // Bool on/off                      (Only on RX)
+    Message_package[5] = 0;                         // Current time                     (Only on RX)
       
     // Send message(s)
     for (uint8_t i=0; i < 6; i++) {
@@ -147,6 +153,7 @@ bool Send_message(uint16_t Arg_float) {
 
 // Try to send message n times
 bool Try_send_message() {
+    println("Try send");
     uint16_t Charge_remaining = Battery_charge_remaining();
     for (uint8_t i = 0; i < 4; i++) {
         if (Send_message(Charge_remaining)) {
@@ -161,7 +168,7 @@ bool Try_send_message() {
 
 
 // Hardware reset
-void Hardware_reset_after_15min(uint16_t Seconds = 60 * 15) {
+void Hardware_reset_after_15min(uint16_t Seconds = 60 * 15) { 
     println("Hardware reset");
     #if ATtiny84_ON
         unsigned long Timeout = 1000UL * Seconds; 
@@ -195,8 +202,8 @@ void Deepsleep() {
     set_sleep_mode(SLEEP_MODE_PWR_DOWN);
     sleep_enable();
 
-    // Wake by watchdog every 8s, go back to sleep if Deepsleep_count < 4400. About 12h. Each cycle = 9.8s
-    while (Deepsleep_count < 1) {
+    // Wake by watchdog every 8s, go back to sleep if Deepsleep_count < Sleep_how_long. Each cycle = 9.8s
+    while (Deepsleep_count < (Sleep_how_long * 367)) { 
         noInterrupts();
 		sleep_bod_disable();
 
@@ -209,18 +216,18 @@ void Deepsleep() {
 		sleep_cpu();  
 	}
     // 12 hours passed
-	sleep_disable();        // Sleep disable
-	Deepsleep_count = 0;    // Reset deepsleep counter
-	ADCSRA = prevADCSRA;    // Re-enable ADC
+	sleep_disable();                // Sleep disable
+	Deepsleep_count = 0;            // Reset deepsleep counter
+	ADCSRA = prevADCSRA;            // Re-enable ADC
     delay(500);
-    Hardware_reset_after_15min(1);
+    Hardware_reset_after_15min(1);  // millis() doesnt reset otherwise
 }
 #endif
 
 
 // Get available message
 bool Get_available_message() {
-    unsigned long Msg_timer = millis() + 1000 * 5;
+    unsigned long Msg_timer = millis() + 5 * 1000UL;
     uint16_t CRC_check;
     uint16_t CRC_sum = 0;
     uint16_t Message;
@@ -229,8 +236,8 @@ bool Get_available_message() {
     for (uint8_t i=0; i<6; i++) {
         if (radio.available()) {     
             radio.read(&Message, sizeof(Message));
-            Message_package[i] = Message & 0x0FFF;
-            CRC_check = (Message >> 12) & 0x0F;
+            Message_package[i] = Message & 0x0FFF;  // Save only Msg
+            CRC_check = (Message >> 12) & 0x0F;     // Save only Msg ID
             CRC_sum += CRC_check;              
         }
         // Wait for next Msg. Break if time is up
@@ -271,11 +278,12 @@ bool Wait_for_message(uint16_t Offset) {
 
 // Used to have <TimeLib.h> for this but ran out of memory :/
 void Calc_time_until_sleep() {
+    println("Calc sleep");
 
     // Time from master (uint16_t) formated "hhmm"
     int16_t Current_time = Message_package[5]; 
 
-    // Convert incomming msg to hours and minutes left until Sleep_time
+    // Convert incomming msg to: hours and minutes left until Sleep_time
     int16_t Hour_left = (Sleep_time / 100) - (Current_time / 100);  
     int16_t Minute_left = (Sleep_time % 100) - (Current_time % 100); 
 
@@ -286,16 +294,15 @@ void Calc_time_until_sleep() {
     if (Hour_left < 0) {        // Negativ hour?
         Hour_left += 24;        // Add 24
     }
-    // Sleep at what millis()?
+    // Sleep at what time?
     unsigned long Millis_left = (Hour_left * 60UL + Minute_left) * 60UL * 1000UL; // Convert to millis
     Sleep_at_this_millis = Millis_left + millis(); // Add current millis() to get an absolute timestamp
-    println("Time acquired");
 }
 
 
 // Send battery charge remaining, get back current time
 void Send_ADC_get_time() {
-    println("Get time");
+    println(); println("Get time");
     WDT_RESET();
 
     // Get time from master or hard reset
@@ -315,10 +322,11 @@ void Send_ADC_get_time() {
     delay(5); 
 
     // Wait for return message 
-    if (Wait_for_message(2000)) {
-        println("Re Msg successful!!");
+    if (Wait_for_message(3000)) {
+        println("Return Msg OK!");
         if ((Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address)) {
             Calc_time_until_sleep(); // Calculate time until deepsleep, dependent on the current time
+            println("Time set!");
             radio.flush_rx();
             radio.flush_tx();
             delay(5); 
@@ -333,14 +341,15 @@ void Send_ADC_get_time() {
 // ADC CAL DEBUG FUNC
 #if ADC_CAL_ON
     void ADC_CAL_FUNC() {
+        digitalWrite(ADC_Enable_Pin, HIGH);
         while (true) {
             uint32_t Sum = 0;
             for (uint8_t i = 0; i < 100; i++) {
-                uint16_t Value = analogRead(ADC_PIN); 
+                uint16_t Value = analogRead(ADC_Measure_PIN); 
                 Sum += Value;
             }
             uint16_t Average = Sum / 100;           
-            print("   Int: "); println(Average);
+            print("   Value: "); println(Average);
         }
     }
 #endif

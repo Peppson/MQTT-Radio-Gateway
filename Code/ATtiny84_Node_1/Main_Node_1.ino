@@ -40,7 +40,7 @@ void loop() {
 
         // Listen for incomming messages
         if (Wait_for_message(200)) {
-            println("Message received!");
+            println("Msg received!");
             // Start waterpump?
             if ((Message_package[0] == This_dev_address) && (Message_package[1] == Master_node_address) && (Message_package[4] == 1)) {
                 Start_water_pump(Message_package[2]);
@@ -55,7 +55,7 @@ void loop() {
             delay(Sleep_radio_for_ms);
         }     
     }
-    // Send battery status every Update_interval //TODO test 
+    // Send battery status every Update_interval 
     Current_millis = millis();   
     if (Current_millis > Prev_millis) {
         Send_ADC_get_time();
