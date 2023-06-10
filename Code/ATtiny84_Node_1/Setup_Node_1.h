@@ -35,7 +35,7 @@
 #define Radio_channel 124                   // Radio channel
 #define Radio_output RF24_PA_MIN            // Output level: RF24_PA_MIN, RF24_PA_LOW, RF24_PA_HIGH, RF24_PA_MAX
 
-#define Pump_runtime_max 10                 // Maximum time pump is allowed to run (s)              
+#define Pump_runtime_max 15                 // Maximum time pump is allowed to run (s)              
 #define Sleep_time 2100                     // Go to deepsleep at what time? (hhmm)
 #define Sleep_how_long 12                   // Deepsleep how long in (h)
 #define Update_interval 3*60*60*1000UL      // How often should the node report its battery status? (h*m*s*ms)
@@ -86,7 +86,7 @@
 
 // Globals
 unsigned long
-Prev_millis,                                // Init
+ADC_at_this_millis,                         // Init
 Current_millis,                             // Init
 Sleep_at_this_millis;                       // Init
 

@@ -72,6 +72,7 @@ void Setup_everything() {
 
 // Message received, start waterpump for n seconds
 void Start_water_pump(uint8_t How_long = 2){
+    println("Pump");
     WDT_RESET();
     radio.stopListening();
 
@@ -281,7 +282,7 @@ void Calc_time_until_sleep() {
     println("Calc sleep");
 
     // Time from master (uint16_t) formated "hhmm"
-    int16_t Current_time = Message_package[5]; 
+    int16_t Current_time = Message_package[5];
 
     // Convert incomming msg to: hours and minutes left until Sleep_time
     int16_t Hour_left = (Sleep_time / 100) - (Current_time / 100);  
@@ -294,9 +295,16 @@ void Calc_time_until_sleep() {
     if (Hour_left < 0) {        // Negativ hour?
         Hour_left += 24;        // Add 24
     }
+
+    // Is Current_time greater than Sleep_time?
+    if (Current_time > Sleep_time) {
+        Hour_left = 0;
+        Minute_left = 0;
+    }
     // Sleep at what time?
     unsigned long Millis_left = (Hour_left * 60UL + Minute_left) * 60UL * 1000UL; // Convert to millis
     Sleep_at_this_millis = Millis_left + millis(); // Add current millis() to get an absolute timestamp
+    
 }
 
 

@@ -23,7 +23,7 @@ void setup() {
         while (1) { ADC_CAL_FUNC(); }
     #endif
     Send_ADC_get_time();
-    Prev_millis = millis() + Update_interval;
+    ADC_at_this_millis = millis() + Update_interval;
 }
 
 
@@ -55,15 +55,16 @@ void loop() {
             delay(Sleep_radio_for_ms);
         }     
     }
-    // Send battery status every Update_interval 
-    Current_millis = millis();   
-    if (Current_millis > Prev_millis) {
-        Send_ADC_get_time();
-        Prev_millis = millis() + Update_interval;
-    } 
     // Time to sleep?
-    else if (Current_millis > Sleep_at_this_millis) {
+    Current_millis = millis();
+    if (Current_millis > Sleep_at_this_millis) {
         Deepsleep_device();
+    }
+    // Send battery status every Update_interval
+    else if (Current_millis > ADC_at_this_millis) {
+        Send_ADC_get_time();
+        ADC_at_this_millis = millis() + Update_interval;
     } 
+     
 }
 
