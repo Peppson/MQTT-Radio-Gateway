@@ -21,7 +21,7 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 - SPDT Switch [Link](https://www.electrokit.com/produkt/skjutomkopplare-1-pol-on-on-pcb-2/)
 - TP4056 Module [Link](https://www.amazon.se/ZkeeShop-laddningsmodul-litiumbatteri-laddningskort-skyddsfunktion/dp/B08BZP283B/ref=sr_1_5?crid=26YZ4CVG0ZU1C&keywords=TP4056&qid=1684667989&sprefix=tp4056%2Caps%2C87&sr=8-5)
 - 3.3V Regulator [Link](https://www.electrokit.com/produkt/mcp1700-3302e-to-to-92-ldo-spanningsregulator-3-3v-250ma/)
-- PN2222A [Link](https://www.electrokit.com/produkt/pn2222a-to-92-npn-40v-800ma/)
+- PN2222A (NPN) [Link](https://www.electrokit.com/produkt/pn2222a-to-92-npn-40v-800ma/)
 - 2N3904 (NPN) [Link](https://www.electrokit.com/produkt/2n3904-to-92-npn-50v-200ma/)
 - 2N3906 (PNP) [Link](https://www.electrokit.com/produkt/2n3906-to-92-pnp-40v-200ma/)
 - Ceramic Capacitors 1uf
