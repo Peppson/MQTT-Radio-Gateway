@@ -13,7 +13,7 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 &nbsp;
 ## Schematic
 &nbsp;
-![img](https://github.com/Peppson/Vattna_Bara/blob/main/Images/Schematic.png)
+![img](https://github.com/Peppson/Vattna_Bara/blob/main/NRF_Node_Schematic.png)
 &nbsp;
 
 ## Parts
