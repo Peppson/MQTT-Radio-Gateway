@@ -9,8 +9,8 @@ Using an ATtiny84 and NRF24l01 module. Controlled via HomeAssistant.
 ## Pcb
 &nbsp;
 <p float="left">
-  <img src="https://github.com/Peppson/Vattna_Bara/blob/main/Images/NRF_Node_PcbNaked.png" width="480" /> 
-  <img src="https://github.com/Peppson/Vattna_Bara/blob/main/Images/NRF_Node_Pcb.png" width="480" /> 
+  <img src="https://github.com/Peppson/Vattna_Bara/blob/main/Images/NRF_Node_PcbNaked.png" width="300" /> 
+  <img src="https://github.com/Peppson/Vattna_Bara/blob/main/Images/NRF_Node_Pcb.png" width="300" /> 
 </p>
 
 &nbsp;
