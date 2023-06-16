@@ -1,4 +1,3 @@
-#include "Arduino.h"
 
 /*
 ########################  Node 1 Functions  #########################
@@ -13,7 +12,7 @@
 
 // Functions_Node_1
 #pragma once
-namespace Functions {
+#include "Arduino.h"
 
 
 // Setup 
@@ -24,6 +23,13 @@ void Setup_everything() {
         MCUSR &= ~(1<<WDRF);
         wdt_disable();
     #endif
+
+    // Pin setup
+    pinMode(PUMP_PIN, OUTPUT);
+    pinMode(ADC_Enable_Pin, OUTPUT);
+    pinMode(ADC_Measure_PIN, INPUT);
+    digitalWrite(ADC_Enable_Pin, LOW);
+    digitalWrite(PUMP_PIN, LOW);
 
     // Serial
     #if SERIAL_ON
@@ -41,7 +47,7 @@ void Setup_everything() {
         }
         println("Radio OK!"); 
     #else
-        // With Serial off 
+        // Serial off 
         if (!radio.begin() || !radio.isChipConnected()) {
             while (true) {}  
         }  
@@ -53,14 +59,7 @@ void Setup_everything() {
     radio.setDataRate(RF24_2MBPS);                                          // Datarate: RF24_2MBPS, RF24_1MBPS, RF24_250KBPS
     radio.openWritingPipe(address[Master_node_address]);                    // Send to master = 0
     radio.openReadingPipe(This_dev_address, address[This_dev_address]);     // What pipe to listen on
-    
-    // Pin setup
-    pinMode(PUMP_PIN, OUTPUT);
-    pinMode(ADC_Enable_Pin, OUTPUT);
-    pinMode(ADC_Measure_PIN, INPUT);
-    digitalWrite(ADC_Enable_Pin, LOW);
-    digitalWrite(PUMP_PIN, LOW);
-    delay(4000);
+    delay(4000);                                                            // Allow time for things to settle down
     
     // Watchdog
     #if ATtiny84_ON
@@ -115,7 +114,7 @@ uint16_t Battery_charge_remaining() {
     delay(10);
     return Charge_remaining;
 }
-  
+    
 
 // Send message 
 bool Send_message(uint16_t Arg_float) {
@@ -281,12 +280,12 @@ bool Wait_for_message(uint16_t Offset) {
 void Calc_time_until_sleep() {
     println("Calc sleep");
 
-    // Time from master (uint16_t) formated "hhmm"
+    // Time from master (uint16_t) formated "hhmm"     
     int16_t Current_time = Message_package[5];
 
     // Convert incomming msg to: hours and minutes left until Sleep_time
     int16_t Hour_left = (Sleep_time / 100) - (Current_time / 100);  
-    int16_t Minute_left = (Sleep_time % 100) - (Current_time % 100); 
+    int16_t Minute_left = (Sleep_time % 100) - (Current_time % 100);  
 
     if (Minute_left < 0) {      // Negativ minute?
         Hour_left--;            // Subtract 1 from Hour_left
@@ -299,7 +298,7 @@ void Calc_time_until_sleep() {
     // Is Current_time greater than Sleep_time?
     if (Current_time > Sleep_time) {
         Hour_left = 0;
-        Minute_left = 0;
+        Minute_left = 0;   
     }
     // Sleep at what time?
     unsigned long Millis_left = (Hour_left * 60UL + Minute_left) * 60UL * 1000UL; // Convert to millis
@@ -349,18 +348,19 @@ void Send_ADC_get_time() {
 // ADC CAL DEBUG FUNC
 #if ADC_CAL_ON
     void ADC_CAL_FUNC() {
+        wdt_disable();
         digitalWrite(ADC_Enable_Pin, HIGH);
-        while (true) {
+
+        while (1) {
             uint32_t Sum = 0;
             for (uint8_t i = 0; i < 100; i++) {
                 uint16_t Value = analogRead(ADC_Measure_PIN); 
                 Sum += Value;
+                delay(10); 
             }
-            uint16_t Average = Sum / 100;           
-            print("   Value: "); println(Average);
+            uint16_t ADC_average = Sum / 100;           
+            print("Avg: "); println(ADC_average);
         }
     }
 #endif
 
-
-}

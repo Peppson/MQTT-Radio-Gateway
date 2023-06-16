@@ -4,10 +4,10 @@
 # - ATtiny84                                                        #
 #                        VCC  1|o   |14 GND                         #
 #                        10   2|    |13 A0/0 (AREF)                 #
-#                        9    3|    |12 A1/1                        #
-#                        RST  4|    |11 A2/2 --- Radio   CE         #
-#               PUMP --- PB2  5|    |10 A3/3 --- Radio  CSN         #
-#               ADC --- A7/7  6|    |9  A4/4 --- Radio  SCK         #
+#                        9    3|    |12 A1/1 --- ADC_Enable_Pin     #
+#         Pullup 10K --- RST  4|    |11 A2/2 --- Radio   CE         #
+#           PUMP_PIN --- PB2  5|    |10 A3/3 --- Radio  CSN         #
+#   ADC_Measure_PIN --- A7/7  6|    |9  A4/4 --- Radio  SCK         #
 #        Radio MISO --- A6/6  7|    |8  A5/5 --- Radio MOSI         #
 #                                                                   #
 # - Pico zero pinout                                                #
@@ -26,8 +26,8 @@
 
 // User Controlled
 #define ATtiny84_ON 1                       // ATtiny84 or pico    
-#define SERIAL_ON 1                         // Serial toggle
-#define ADC_CAL_ON 0                        // Enter ADC_CAL_FUNC
+#define SERIAL_ON 0                         // Serial toggle
+#define ADC_CAL_ON 0                        // Enter ADC_CAL_FUNC (req SERIAL_ON)
 
 #define This_dev_address 1                  // Device address 
 #define Master_node_address 0               // Address of master
@@ -39,7 +39,7 @@
 #define Sleep_time 2100                     // Go to deepsleep at what time? (hhmm)
 #define Sleep_how_long 12                   // Deepsleep how long in (h)
 #define Update_interval 3*60*60*1000UL      // How often should the node report its battery status? (h*m*s*ms)
-#define Main_loop_iterations 100            // How many loop iterations 
+#define Main_loop_iterations 20             // How many loop iterations 
 
 
 // Board Select
@@ -91,7 +91,7 @@ Current_millis,                             // Init
 Sleep_at_this_millis;                       // Init
 
 volatile int 
-Deepsleep_count = 0;                        // Counter in deepsleep
+Deepsleep_count = 0;                        // Counter in deepsleep      
 
 // Message package                          
 uint16_t Msg_to_who;                        // Attiny84 have 2 bytes for Tx and Rx buffers...
@@ -108,5 +108,4 @@ const uint8_t address[5][6] = {"1Adrs", "2Adrs", "3Adrs", "4Adrs", "5Adrs"};
 
 // Radio object
 RF24 radio(CE_PIN, CSN_PIN);  
-
 

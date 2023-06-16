@@ -13,17 +13,17 @@
 // Main_Node_1
 #include "Setup_Node_1.h"
 #include "Functions_Node_1.h"
-using namespace Functions;
 
 
 // Setup
-void setup() {
+void setup() { 
     Setup_everything();
     #if ADC_CAL_ON
-        while (1) { ADC_CAL_FUNC(); }
-    #endif
-    Send_ADC_get_time();
-    ADC_at_this_millis = millis() + Update_interval;
+        ADC_CAL_FUNC();
+    #else
+        Send_ADC_get_time();
+        ADC_at_this_millis = millis() + Update_interval;
+    #endif 
 }
 
 
@@ -62,9 +62,10 @@ void loop() {
     }
     // Send battery status every Update_interval
     else if (Current_millis > ADC_at_this_millis) {
-        Send_ADC_get_time();
-        ADC_at_this_millis = millis() + Update_interval;
-    } 
-     
+        #if !ADC_CAL_ON
+            Send_ADC_get_time();
+            ADC_at_this_millis = millis() + Update_interval;
+        #endif
+    }    
 }
 
