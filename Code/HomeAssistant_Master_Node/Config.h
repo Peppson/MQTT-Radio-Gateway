@@ -1,6 +1,10 @@
 
+/*
+########################  Master Config  #########################
+*/
 
-// Config.h/cpp
+
+// Config.h
 #pragma once
 #include "Secrets.h"
 #include <SPI.h>  
@@ -10,14 +14,15 @@
 #include <ETH.h>
 #include <MQTT.h>
 #include <ArduinoJson.h>
+#include "Captured_RF_Remote_Codes.h"
 
 
 // User Controlled
 #define SERIAL_ON 1                                 // Serial On/Off
-#define This_dev_address  0                         // Device address                                        
-#define Radio_channel  124                          // Radio channel
-#define Radio_output RF24_PA_MAX                    // Output level: RF24_PA_MIN, RF24_PA_LOW, RF24_PA_HIGH, RF24_PA_MAX
-#define Main_loop_iterations 500000                 // 
+#define This_dev_address  0                         // NRF24 device address                                        
+#define Radio_channel  124                          // NRF24 radio channel
+#define Radio_output RF24_PA_MAX                    // NRF24 output level: RF24_PA_MIN, RF24_PA_LOW, RF24_PA_HIGH, RF24_PA_MAX
+#define Main_loop_iterations 500000                 // Snus är fint
 #define Check_time_interval (14*60*60*1000UL)       // How often to grab current time (Should never happen) 
 
 
@@ -27,7 +32,7 @@
     #define println(x) Serial.println(x)
     #define Print_package() Print_debug_package()
 #else
-    //Cast Print statements into nothing
+    // Cast Print statements into nothing
     #define print(x)
     #define println(x)
     #define Print_package() 
@@ -38,16 +43,16 @@
 ######################  LAN8720 Ethernet module - ESP32 R1 R32  ######################
 - Using default SPI pins with VSPI
 
-    * GPIO02    -   NC (From NC > Osc enable pin on Lan8720 module)     
+    * GPIO02    -   NC (From NC > Osc enable pin on Lan8720 module, ETH_POWER_PIN) 
     * GPIO22    -   TX1                                      
     * GPIO19    -   TX0                                      
     * GPIO21    -   TX_EN                                    
     * GPIO26    -   RX1                                     
     * GPIO25    -   RX0                                      
     * GPIO27    -   CRS                                      
-    * GPIO00    -   nINT/REFCLK (4k7 Pullup to 3.3V)    
-    * GPIO23    -   MDC                                      
-    * GPIO18    -   MDIO                                     
+    * GPIO00    -   nINT/REFCLK     (4k7 Pullup > 3.3V)    
+    * GPIO23    -   MDC             (ETH_MDC_PIN)                                    
+    * GPIO18    -   MDIO            (ETH_MDIO_PIN)                                 
     * 3V3       -   VCC
     * GND       -   GND                                           
     
@@ -63,45 +68,50 @@
 */
 
 
-// Black magic!
+// LAN8720 module
 #define ETH_TYPE        ETH_PHY_LAN8720
 #define ETH_CLK_MODE    ETH_CLOCK_GPIO0_IN    
-#define ETH_ADDR        1                       
+#define ETH_ADDR        1                      
 #define ETH_POWER_PIN   2                        
 #define ETH_MDC_PIN     23      
 #define ETH_MDIO_PIN    18
 
-
-// NRF24L01, H SPI
+// NRF24L01 module
 #define SPI_2_MISO   12
 #define SPI_2_MOSI   13
 #define SPI_2_SCLK   14
 #define SPI_2_CE     16 
-#define SPI_2_CSN    5 
+#define SPI_2_CSN    5
+
+// 433Mhz radio
+#define RF433_TX_PIN 17 //33
+#define RF433_RX_PIN 32
 
 
 // Globals
+int Remove_this_var_TODO = 2;
+
 unsigned long 
 Prev_millis;
 
-// Message package
-uint16_t Msg_to_who;                        // Attiny84 only have 2 bytes for Tx and Rx buffers...
-uint16_t Msg_from_who;                      // Splitting up packages into small chunks of data 
-uint16_t Msg_int;                           // uint16_t (2 Bytes) is max
+// NRF24 radio messages package
+uint16_t Msg_to_who;                        // Attiny84 have 2 bytes for Tx and Rx buffers...
+uint16_t Msg_from_who;                      // splitting up packages into small chunks of data 
+uint16_t Msg_int;                           
 uint16_t Msg_float; 
 uint16_t Msg_state; 
 uint16_t Msg_time;
-uint16_t Message_package[6] = {Msg_to_who, Msg_from_who, Msg_int, Msg_float, Msg_state, Msg_time};                        
+uint16_t NRF24_package[6] = {Msg_to_who, Msg_from_who, Msg_int, Msg_float, Msg_state, Msg_time};                        
 
 // Address array for "This_dev_address"     
 const uint8_t address[5][6] = {"1Adrs", "2Adrs", "3Adrs", "4Adrs", "5Adrs"};     
 
 
-// Init Radio, both SPIbuses and ETH client
+// Init objects
 RF24 radio(SPI_2_CE, SPI_2_CSN);
 SPIClass spiBus1(VSPI); 
 SPIClass spiBus2(HSPI);
-WiFiClient Wifi_client;
+WiFiClient ETH_client; // Rj45 connection
 MQTTClient MQTT_client;
 
 
