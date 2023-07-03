@@ -1,29 +1,33 @@
 
 /*
-###########################  Node 1 Main  ###########################
+#########################  NRF Node 1 Main  #########################
 #                                                                   #
-#   - Flower_waterpump, controlled via Home Assistant               #                                          
-#   - Library, TMRh20/RF24: https://github.com/tmrh20/RF24/         #     
-#   - Class config: https://nrf24.github.io/RF24/classRF24.html     #     
-#   - NRF24L01 Address "1"                                          #
+#   - Self watering flowerpot, controlled via MQTT/Radio gateway    #                                          
+#   - NRF24L01+ Radio Address "1"                                   #     
+#   - RF24_NODE_TYPE "1"                                            #
+#   - Target Mcu ATtiny84A @ 1Mhz                                   #
 #                                                                   #
 #####################################################################
 */
 
 
+// Main_Node_1.ino
 #include "Config.h"
 #include "Program.h"
 class NRF24L01_radio RF24_radio;
+class Hardware_class Hardware;
 
 
 // Setup
 void setup() { 
-    hardware::Setup();
-    #if ADC_CAL_ON
+    Hardware.Setup();
+    #if __ADC_CAL_ON__
         ADC_CAL_FUNC();
-    #endif 
-    RF24_radio.Send_ADC_get_time();
-    ADC_at_this_millis = millis() + UPDATE_INTERVAL;   
+    #else
+        Hardware.Is_watertank_empty();
+        RF24_radio.Send_data_get_time();
+        ADC_at_this_millis = millis() + UPDATE_INTERVAL;
+    #endif     
 }
 
 
@@ -40,34 +44,37 @@ void loop() {
         RF24_radio.startListening();
 
         // Listen for incomming message, start waterpump?
-        if (RF24_radio.Wait_for_message(200, RF24_package)) {
-            if ((RF24_package[0] == THIS_DEV_ADDRESS) 
-            &&  (RF24_package[1] == MASTER_NODE_ADDRESS) 
-            &&  (RF24_package[4] == true)) {
-                hardware::Start_water_pump(RF24_package[2]);
-                RF24_radio.flush_rx(); 
-                RF24_radio.flush_tx(); 
-            }
-        }  
+        if (RF24_radio.Wait_for_message(200, RF24_package) 
+        && ((RF24_package[0] == RF24_THIS_DEV_ADDRESS) 
+        &&  (RF24_package[1] == RF24_MASTER_NODE_ADDRESS) 
+        &&  (RF24_package[4] == true))) {
+            Hardware.Start_water_pump(RF24_package[2]);
+            RF24_radio.flush_rx(); 
+            RF24_radio.flush_tx();
+        }
         // Powerdown radio 
         RF24_radio.stopListening();
         if (i < MAIN_LOOP_ITERATIONS) {
             RF24_radio.powerDown();
-            delay(SLEEP_RADIO_TIME);
+            delay(RF24_SLEEP_TIME);
         }     
-    }
-    // Time to deepsleep?
-    unsigned long Current_millis = millis();
-    if (Current_millis > Sleep_at_this_millis) {
-        DEEPSLEEP(); 
-            
-    // Send battery status every Update_interval
-    } else if (Current_millis > ADC_at_this_millis) {
-        #if !ADC_CAL_ON  
-            RF24_radio.Send_ADC_get_time();
-            ADC_at_this_millis = millis() + UPDATE_INTERVAL;
-        #endif // Memory related
-    }    
+    } 
+    #if __ATTINY84_ON__ && !__SERIAL_ON__
+        unsigned long Current_millis = millis();
+        
+        // Time to deepsleep?
+        if (Current_millis > Sleep_at_this_millis) {
+            DEEPSLEEP(); 
+
+        // Send node status every Update_interval
+        } else if (Current_millis > ADC_at_this_millis) {
+            // Memory related #if... 
+            #if !__ADC_CAL_ON__ 
+                RF24_radio.Send_data_get_time();
+                ADC_at_this_millis = millis() + UPDATE_INTERVAL;
+            #endif 
+        }
+    #endif    
 }
 
 

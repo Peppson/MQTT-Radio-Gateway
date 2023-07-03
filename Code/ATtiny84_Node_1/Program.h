@@ -1,7 +1,7 @@
 
 
 
-
+// Program.h
 #ifndef __PROGRAM_H__
 #define __PROGRAM_H__
 #include "Config.h"
@@ -10,8 +10,8 @@
 // NRF24L01 Radio
 class NRF24L01_radio : public RF24 {
     private:
-        // Radio device addresses     
-        const uint8_t address[2][6] = {"1Adrs", "2Adrs" /*, "3Adrs", "4Adrs", "5Adrs" */};  
+        // Radio device addresses {Master, self}    
+        const uint8_t address[2][6] = {"0Adrs", RF24_THIS_DEV_ADDRESS_STR};  
         
     public:
         // Constructor inline
@@ -32,51 +32,66 @@ class NRF24L01_radio : public RF24 {
         // Wait for incomming message 
         bool Wait_for_message(uint16_t how_long, uint16_t* RF24_package_ptr);
 
-        // Send battery charge remaining, get back current time
-        void Send_ADC_get_time();
+        // Send battery and waterlevel status, get back the current time
+        void Send_data_get_time();
 };
 
 
-namespace hardware {
 
-// Setup 
-void Setup();
+// Hardware 
+class Hardware_class {
+    public:
+        // Setup 
+        void Setup();
 
-// Message received, start waterpump for n seconds
-void Start_water_pump(uint8_t How_long = 2);
+        // Get ADC reading from battery circuit
+        uint16_t Battery_charge_remaining();
 
-// Get ADC reading from battery
-uint16_t Battery_charge_remaining();
+        // // Start waterpump for param seconds
+        void Start_water_pump(uint8_t How_long = 2);
 
-// Hardware reset
-void Reset_after_15min(uint16_t Seconds = 60 * 15);
+        // Hardware reset
+        void Reset_devices(bool now);
 
-// Used to have <TimeLib.h> for this but ran out of memory :/
+        // Check watertank
+        bool Is_watertank_empty();
+
+        // ATtiny84 + NRF24 deepsleep (Total board cunsumption about 9 µA)
+        #if __ATTINY84_ON__
+            void Deepsleep();
+        #endif
+};
+
+
+
+namespace helper {
+
+// Read in values from EEPROM memory
+uint8_t Read_waterlevel_from_EEPROM(bool calc = false);
+
+// Used to have <TimeLib.h> for this but ran out of progmem :/
 void Calc_time_until_sleep(uint16_t* RF24_package_ptr);
 
-#if ATTINY84_ON
-    // Watchdog ISR 
+// Deepsleep Watchdog interrupt service routine
+#if __ATTINY84_ON__ 
     ISR (WDT_vect);
-
-    // ATtiny84 + NRF24 Deepsleep (about 5 µA)
-    void Deepsleep();
 #endif
 
-} // namespace hardware
+} // namespace helper
+
 
 
 //####################  DEBUG  ####################
-#if SERIAL_ON
-    #if ADC_CAL_ON
-        // ADC CAL DEBUG FUNC
-        void ADC_CAL_FUNC();
-    #endif
 
-    #if !ATTINY84_ON
-        // Print message package
-        void Print_package(uint16_t* RF24_package);
-    #endif
+// ADC/volt calibration 
+#if __SERIAL_ON__ && __ADC_CAL_ON__
+    void ADC_CAL_FUNC();
+
+// Print message package
+#elif __SERIAL_ON__ && !__ATTINY84_ON__
+    void Print_package(uint16_t* RF24_package);
 #endif
+
 
 #endif // __PROGRAM_H__
 
