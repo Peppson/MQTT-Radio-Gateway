@@ -50,8 +50,7 @@ Finished project image:
 
 &nbsp; 
 ## License 
-This repository is licensed under the MIT license. See the 
-[LICENSE](./LICENSE) file for more information.
+See the [LICENSE](./LICENSE) file for more information.
 
 &nbsp; 
 
