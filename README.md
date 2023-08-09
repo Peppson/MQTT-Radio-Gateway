@@ -2,7 +2,7 @@
 
 ![flow_diagram](./.images/flow_diagram.png)
 
-<div align="left">
+<div align="center">
     <h1>
         MQTT Radio Gateway         
         <a href="https://opensource.org/licenses/MIT"> 
