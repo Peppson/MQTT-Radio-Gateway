@@ -5,9 +5,9 @@
 <div align="center">
     <h1>
         MQTT Radio Gateway         
-        <a href="https://opensource.org/licenses/MIT"> 
-            <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
-        </a>
+        <a href="https://www.gnu.org/licenses/gpl-3.0"> 
+            <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="GPL-3.0 License">
+        </a>    
         <a href="https://github.com/Peppson/Radio-Nodes"> 
             <img src="https://img.shields.io/badge/Radio-Nodes-88C0D0.svg" alt="Radio-Nodes">
         </a>    
