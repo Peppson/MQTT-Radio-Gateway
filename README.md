@@ -39,19 +39,19 @@ Integrates a *LAN8720* ethernet module, a *NRF24L01* 2.4Ghz transceiver
 and some extra I/O pins in a compact format.  
 
 Kicad files can be found here: 
-[📂 .kicad - ESP32 shield](./.kicad%20-%20ESP32%20shield)  
-Finished project image: 
-[📷 .images/gateway.jpg](./.images/gateway.jpg)  
+[📂 .kicad - ESP32 shield/](./.kicad%20-%20ESP32%20shield)  
+More project images in: 
+[📂 .images/](./.images/)  
 
 &nbsp;
-![Kicad PCB img](./.images/kicad_PCB_schematic.png)
+![Kicad PCB img](./.images/kicad_PCB_schematic.png)   
 
+### Finished hardware:
 
+![Finished hardware](./.images/gateway.jpg)   
 
-&nbsp; 
 ## License 
 See the [LICENSE](./LICENSE) file for more information.
-
 &nbsp; 
 
 
