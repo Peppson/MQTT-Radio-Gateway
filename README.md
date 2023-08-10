@@ -48,7 +48,7 @@ More project images in:
 
 ### Finished hardware:
 
-![Finished hardware](./.images/gateway.jpg)   
+![Finished hardware](./.images/finished_hardware.jpg)   
 
 ## License 
 See the [LICENSE](./LICENSE) file for more information.
